@@ -60,7 +60,9 @@ export function buildProps(scene) {
     const place = (o, p) => { o.position.set(p.x, p.y - 0.15, p.z); o.rotation.set(0, p.rot, 0); o.scale.set(p.s, p.s * (0.9 + hr(p.x, p.z, 1) * 0.3), p.s); };
     const tint = (c, p) => c.setScalar(0.85 + hr(p.x, p.z, 2) * 0.3);
     group.add(instanced(trunk, std(T.bark(), { vertexColors: true }), P.pines, place, { tint }));
-    group.add(instanced(canopy, std(T.needles(), { vertexColors: true }), P.pines, place, { tint }));
+    // sunken pines read as pink/orange coral spires
+    const coral = (c, p) => c.setHSL(0.01 + hr(p.x, p.z, 4) * 0.1 + (hr(p.z, p.x, 6) > 0.7 ? 0.8 : 0), 0.65, 0.55);
+    group.add(instanced(canopy, std(T.needles(), { vertexColors: true }), P.pines, place, { tint: coral }));
   }
 
   // ---- palms ---------------------------------------------------------------
@@ -115,7 +117,10 @@ export function buildProps(scene) {
     ]);
     const place = (o, p) => { o.position.set(p.x, p.y - 0.02, p.z); o.rotation.set(0, p.rot, 0); o.scale.setScalar(p.s); };
     group.add(instanced(cross(1.3, 0.9), new THREE.MeshStandardMaterial({ map: A.tuft(), alphaTest: 0.5, side: THREE.DoubleSide, roughness: 1 }), P.tufts, place, { cast: false }));
-    group.add(instanced(cross(1.5, 2.2), new THREE.MeshStandardMaterial({ map: A.reed(), alphaTest: 0.5, side: THREE.DoubleSide, roughness: 1 }), P.reeds, place, { cast: false }));
+    // kelp: tall, swaying-green strands
+    const kelpPlace = (o, p) => { o.position.set(p.x, p.y - 0.02, p.z); o.rotation.set(0, p.rot, 0); o.scale.set(p.s * 0.8, p.s * (1.6 + hr(p.x, p.z, 3) * 1.6), p.s * 0.8); };
+    const kelpTint = (c, p) => c.setHSL(0.24 + hr(p.x, p.z, 5) * 0.12, 0.55, 0.42 + hr(p.z, p.x, 7) * 0.12);
+    group.add(instanced(cross(1.5, 2.2), new THREE.MeshStandardMaterial({ map: A.reed(), alphaTest: 0.5, side: THREE.DoubleSide, roughness: 1 }), P.reeds, kelpPlace, { cast: false, tint: kelpTint }));
   }
 
   // ---- shells + driftwood ---------------------------------------------------
