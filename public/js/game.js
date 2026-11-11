@@ -1,7 +1,7 @@
 // Game orchestration: renderer/scene, main loop, networking events, combat feedback.
 import * as THREE from 'three';
 import * as W from '../shared/world.js';
-import { PLAYER, WEAPONS, SKINS, tideLevel, tideRising, TIDE, clamp } from '../shared/constants.js';
+import { PLAYER, WEAPONS, SKINS, tideLevel, clamp } from '../shared/constants.js';
 import { settings, addBanked } from './settings.js';
 import { Net } from './net.js';
 import { audio } from './audio.js';
@@ -19,7 +19,7 @@ import { UI } from './ui.js';
 const $ = (id) => document.getElementById(id);
 const r2 = (v) => Math.round(v * 100) / 100;
 const WEAPON_SND = ['swing', 'harpoon', 'blunder'];
-const UNDER_FOG = new THREE.Color(0x1d5a66), FOG = new THREE.Color(HORIZON);
+const ABYSS = new THREE.Color(0x03121c), DEEP_TMP = new THREE.Color(), UNDER_FOG = new THREE.Color(0x1d6f80), FOG = new THREE.Color(HORIZON);
 
 export class Game {
   constructor() {
@@ -191,7 +191,7 @@ export class Game {
     if (this.mode !== 'game') return;
     const now = performance.now() / 1000;
     for (const row of m.p) {
-      if (row[0] === this.me.id) { this.hp = row[7]; this.carryCount = row[9]; this.protect = !!(row[10] & 2); }
+      if (row[0] === this.me.id) { this.hp = row[7]; this.carryCount = row[9]; this.protect = !!(row[10] & 2); this.o2 = row[11] === undefined ? PLAYER.o2Max : row[11]; }
       else this.remotes.push(row, now);
     }
     this.timeLeft = m.tl; this.timeAt = now;
@@ -219,7 +219,7 @@ export class Game {
       this.phase = 'over'; this.ui.showOver(m, this.me.id); audio.play(m.winner === this.me.id ? 'win' : 'matchEnd');
       if (document.pointerLockElement) { this.leaving = true; document.exitPointerLock(); setTimeout(() => { this.leaving = false; }, 100); }
     } else {
-      this.phase = 'play'; this.ui.hideOver(); this.hud.center('New match - the tide resets', 2200); audio.play('bell'); this.requestLock();
+      this.phase = 'play'; this.ui.hideOver(); this.hud.center('New dive - surface for air', 2200); audio.play('bell'); this.requestLock();
       this.board = this.board.map((b) => ({ ...b, score: 0, kills: 0, deaths: 0 })); this.hud.leaderboard(this.sortedBoard(), this.me.id);
     }
   }
@@ -276,7 +276,7 @@ export class Game {
         const vc = this.charOf(m.v); if (vc) vc.setDead(true);
         const v = this.posOf(m.v); if (v) this.fx.burst(new V(m.x, m.y + 1, m.z), 0xcfd8d8, 14, 4, 0.8, 8, 0.3);
         if (m.v === this.me.id) {
-          this.alive = false; input.fire = false; this.respawnAt = performance.now() / 1000 + PLAYER.respawnMs / 1000; this.deathBy = m.k && m.k !== m.v ? `Washed under by ${killer}` : 'Lost to the tide';
+          this.alive = false; input.fire = false; this.respawnAt = performance.now() / 1000 + PLAYER.respawnMs / 1000; this.deathBy = m.k && m.k !== m.v ? `Dragged under by ${killer}` : 'Out of air';
           audio.play('die'); this.player.dashT = 0; this.carryCount = 0;
         } else {
           audio.play('kill', v ? { x: v.x, z: v.z } : null, 0.7);
@@ -309,7 +309,6 @@ export class Game {
         } else this.hud.feed(`<b>${esc(this.nameOf(m.id))}</b> <span class="muted">banked ${m.v}</span>`);
         break;
       }
-      case 'wet': this.hud.toast('Powder soaked - get out of the water!'); audio.play('wet'); break;
       case 'toast': this.hud.toast(m.m); break;
       case 'lost': { const p = this.remotes.map.get(m.id); if (p) { p.ghost = true; this.remotes.drawTag(p); } break; }
       case 'back': { const p = this.remotes.map.get(m.id); if (p) { p.ghost = false; this.remotes.drawTag(p); } break; }
@@ -327,7 +326,6 @@ export class Game {
     const w = WEAPONS[this.w];
     if (now < this.nextFire) return;
     if (w.mag && (this.ammo[w.id] <= 0 || this.reloadAt[w.id] > now)) { if (now > this.dryT) { audio.play('dry'); this.dryT = now + 0.4; } return; }
-    if (w.wet && level - this.player.y > PLAYER.wetDepth) { this.nextFire = now + 0.35; this.hud.toast('Powder soaked - get out of the water!'); audio.play('wet'); return; }
     this.nextFire = now + w.cooldown + 0.01;
     const d = this.player.aimDirection();
     this.net.send({ t: 'fire', w: w.id, d: [r2(d[0]), r2(d[1]), r2(d[2])] });
@@ -372,11 +370,16 @@ export class Game {
     this.water.position.set(Math.round(cam.x / tile) * tile, level, Math.round(cam.z / tile) * tile);
     const nm = this.water.userData.nm; nm.offset.x = (t * 0.004) % 1; nm.offset.y = (t * 0.0027) % 1;
     updateSky(this.sky, cam, dt); updateProps(this.props, t);
+    const depth = Math.max(0, level - cam.y);
+    this.sky.visible = depth < 0.05;
     const sun = this.lights.sun, tp = this.focus || cam;
     sun.target.position.set(tp.x, tp.y, tp.z); sun.position.set(tp.x + SUN_DIR.x * 100, tp.y + SUN_DIR.y * 100, tp.z + SUN_DIR.z * 100);
-    const under = cam.y < level - 0.05;
-    this.scene.fog.color.copy(under ? UNDER_FOG : FOG); this.scene.background.copy(under ? UNDER_FOG : FOG);
-    this.scene.fog.near = under ? 1 : 70; this.scene.fog.far = under ? 38 : 430;
+    const under = depth > 0.05, dk = Math.min(1, depth / 38);
+    DEEP_TMP.copy(UNDER_FOG).lerp(ABYSS, dk);
+    const fc = under ? DEEP_TMP : FOG;
+    this.scene.fog.color.copy(fc); this.scene.background.copy(fc);
+    this.scene.fog.near = under ? 1 : 70; this.scene.fog.far = under ? 60 - dk * 34 : 430;
+    this.lights.hemi.intensity = under ? 0.95 - dk * 0.6 : 0.95; sun.intensity = under ? 2.5 * (1 - dk * 0.85) : 2.5;
     audio.setTideAmbience(level);
     this.fx.update(dt, this.camera, innerWidth, innerHeight);
     this.relics.update(t, level);
@@ -399,17 +402,15 @@ export class Game {
     for (const e of evs) {
       if (e === 'jump') audio.play('jump'); else if (e === 'land') audio.play('land');
       else if (e === 'step') { const s = this.surfaceSound(P, level); audio.play(s); if (s === 'stepWater') this.fx.ripple(P.x, level, P.z, 1.4); }
-      else if (e === 'swimstroke') { audio.play('splash'); this.fx.ripple(P.x, level, P.z, 2); }
+      else if (e === 'swimstroke') { audio.play('bubble'); this.fx.burst(new THREE.Vector3(P.x, P.y + 1.3, P.z), 0xcfeeff, 3, 0.6, 1.4, -2.5, 0.12); }
     }
-    if (this.wasSwim !== undefined && this.wasSwim !== P.swim) { audio.play('splash'); this.fx.splash(P.x, level, P.z, 12); }
-    this.wasSwim = P.swim;
     if (control) this.fireTick(now, level);
 
     // upload state
     this.sendAcc += dt;
     if (this.alive && this.sendAcc >= 0.05) {
       this.sendAcc = 0;
-      const a = P.swim ? 4 : P.dashT > 0 ? 5 : P.air ? 3 : P.speedH > 6 ? 2 : P.speedH > 1 ? 1 : 0;
+      const a = P.dashT > 0 ? 5 : 4;
       this.net.send({ t: 's', x: r2(P.x), y: r2(P.y), z: r2(P.z), yaw: r2(P.bodyYaw), pitch: r2(P.pitch), a, e: this.epoch });
     }
     // local model
@@ -434,12 +435,9 @@ export class Game {
       this.hudAcc = 0;
       const left = Math.max(0, this.timeLeft - (now - this.timeAt));
       this.hud.setTime(left); this.hud.setHp(this.hp);
-      const rising = tideRising(rtm);
-      const th = (Math.PI * 2 * rtm) / TIDE.period + TIDE.phase;
-      const next = (Math.ceil((th - Math.PI / 2) / Math.PI) * Math.PI + Math.PI / 2 - th) * TIDE.period / (Math.PI * 2);
-      this.hud.setTide(level, rising, next, P.y);
-      if (this.lastRising !== null && this.lastRising !== rising) { audio.play('bell'); this.hud.toast(rising ? 'The tide turns - rising' : 'The tide turns - falling'); }
-      this.lastRising = rising;
+      const o2 = this.o2 === undefined ? PLAYER.o2Max : this.o2;
+      this.hud.setDive(level - P.y, o2);
+      if (o2 < 25 && this.alive && now - (this.lastWarn || 0) > 3) { this.lastWarn = now; audio.play('bell'); this.hud.toast('Low oxygen - head for the surface or the beacon'); }
       const rl = this.reloadAt.map((x) => Math.max(0, (x - now) * 1000));
       this.hud.setWeapons(this.w, this.ammo, rl, null, Math.max(0, P.dashCd));
       if (!this.alive) this.hud.death(true, this.deathBy || 'Eliminated', this.respawnAt - now);
