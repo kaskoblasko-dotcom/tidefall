@@ -143,7 +143,7 @@ export function buildWater() {
   geo.rotateX(-Math.PI / 2);
   const mat = new THREE.MeshPhongMaterial({
     color: 0x2f8088, specular: 0xffe6b8, shininess: 70, transparent: true, opacity: 0.8,
-    normalMap: nm, normalScale: new THREE.Vector2(0.45, 0.45), depthWrite: false,
+    normalMap: nm, normalScale: new THREE.Vector2(0.45, 0.45), depthWrite: false, side: THREE.DoubleSide,
   });
   const mesh = new THREE.Mesh(geo, mat);
   mesh.renderOrder = 2;
