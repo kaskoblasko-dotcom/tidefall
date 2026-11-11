@@ -64,7 +64,7 @@ export class Room {
       x: 0, y: 0, z: 0, yaw: 0, pitch: 0, anim: 0, epoch: 0,
       hp: PLAYER.maxHp, alive: false, respawnAt: 0, protectUntil: 0, iframeUntil: 0, dashUntil: 0, dashReadyAt: 0,
       w: 0, ammo: WEAPONS.map((w) => w.mag), reloadAt: WEAPONS.map(() => 0), nextFire: 0,
-      carried: [], score: 0, kills: 0, deaths: 0, lastDmg: 0, allow: 5, lastState: now(), lastCorr: 0,
+      o2: PLAYER.o2Max, carried: [], score: 0, kills: 0, deaths: 0, lastDmg: 0, allow: 5, lastState: now(), lastCorr: 0,
       connected: true, graceUntil: 0, joinedAt: now(),
     };
     this.players.set(p.id, p);
@@ -119,7 +119,7 @@ export class Room {
   }
   respawn(p, first = false) {
     const s = this.pickSpawn();
-    p.x = s.x + (Math.random() - 0.5) * 2; p.z = s.z + (Math.random() - 0.5) * 2; p.y = W.heightAt(p.x, p.z);
+    p.x = s.x + (Math.random() - 0.5) * 2; p.z = s.z + (Math.random() - 0.5) * 2; p.y = W.heightAt(p.x, p.z) + 1.2; p.o2 = PLAYER.o2Max;
     p.yaw = Math.atan2(p.x, p.z); p.pitch = 0;
     p.epoch++; p.hp = PLAYER.maxHp; p.alive = true; p.allow = 5; p.lastState = now();
     p.protectUntil = now() + PLAYER.protectMs; p.iframeUntil = 0; p.dashUntil = 0;
@@ -152,10 +152,9 @@ export class Room {
     p.lastState = t;
     const dashing = t < p.dashUntil + 120;
     p.allow = Math.min(p.allow + dt * (dashing ? 26 : 11.5), dashing ? 9 : 5);
-    const dist = Math.hypot(m.x - p.x, m.z - p.z);
+    const dist = Math.hypot(m.x - p.x, m.y - p.y, m.z - p.z); // 3D: swimmers move in all axes
     const r = Math.hypot(m.x, m.z);
-    const surf = W.surfaceAt(m.x, m.z, m.y);
-    const bad = dist > p.allow + 0.6 || r > 130 || m.y > Math.max(surf + 2.6, this.level - 0.5) || m.y < W.heightAt(m.x, m.z) - 0.8;
+    const bad = dist > p.allow + 0.6 || r > 130 || m.y > this.level + 0.5 || m.y < W.heightAt(m.x, m.z) - 0.8;
     if (bad) {
       if (t - p.lastCorr > 250) { p.lastCorr = t; p.allow = 0; this.send(p, { t: 'corr', x: r2(p.x), y: r2(p.y), z: r2(p.z), e: p.epoch }); }
       return;
@@ -190,7 +189,6 @@ export class Room {
   onDash(p, m) {
     const t = now();
     if (!p.alive || this.phase !== 'play' || t < p.dashReadyAt || !fin(m.dx, m.dz)) return;
-    if (this.level - p.y > PLAYER.deepDepth) return; // can't dash while swimming
     p.dashReadyAt = t + PLAYER.dash.cooldownMs;
     p.dashUntil = t + PLAYER.dash.ms;
     p.iframeUntil = t + PLAYER.dash.iframeMs;
@@ -318,6 +316,13 @@ export class Room {
     }
   }
 
+  drown(v, amount) {
+    if (!v.alive || this.invuln(v) || this.phase !== 'play') return;
+    v.hp -= amount; v.lastDmg = now();
+    if (Math.floor(v.hp / 4) !== Math.floor((v.hp + amount) / 4)) this.broadcast({ t: 'ev', e: 'hit', a: 0, v: v.id, d: 1, c: 0, w: -1, hp: Math.max(0, Math.round(v.hp)) });
+    if (v.hp <= 0) this.kill(v, null, -1);
+  }
+
   damage(v, dmg, k, wid, crit) {
     if (!v.alive || !v.connected || this.invuln(v) || this.phase !== 'play') return;
     dmg = Math.max(1, Math.round(dmg));
@@ -346,7 +351,7 @@ export class Room {
     const c = { x, z };
     W.clampToSea(c); W.resolveCollisions(c, 0.3, -99);
     r.x = c.x; r.z = c.z; r.y = W.heightAt(c.x, c.z);
-    if (r.y < -0.8) { // sank into the deep: the sea returns it to its wreck later
+    if (r.y < -999) { // (unused underwater: relics simply settle on the seabed)
       r.state = 'wait'; r.respawnAt = now() + 8000; r.x = r.home.x; r.y = r.home.y; r.z = r.home.z; why = 'sunk';
     } else r.state = 'ground';
     this.relicsDirty = true;
@@ -359,7 +364,6 @@ export class Room {
     }
     for (const p of this.players.values()) {
       if (!p.alive || !p.connected) continue;
-      if (p.carried.length && this.isDeep(p)) { this.dropAll(p, 'swim'); this.send(p, { t: 'ev', e: 'toast', m: 'The current tears your loot away.' }); }
       // pick up
       if (p.carried.length < PLAYER.maxCarry) {
         for (const r of this.relics) {
@@ -371,7 +375,7 @@ export class Room {
         }
       }
       // bank
-      if (p.carried.length && Math.hypot(p.x - W.BANK.x, p.z - W.BANK.z) < W.BANK.r && Math.abs(p.y - W.heightAt(W.BANK.x, W.BANK.z)) < 3) {
+      if (p.carried.length && Math.hypot(p.x - W.BANK.x, p.z - W.BANK.z) < W.BANK.r && Math.abs(p.y - W.heightAt(W.BANK.x, W.BANK.z)) < 7) {
         let total = 0;
         for (const id of p.carried) {
           const r = this.relics.find((q) => q.id === id);
@@ -382,6 +386,16 @@ export class Room {
         p.score += total; this.boardDirty = true; this.relicsDirty = true;
         this.broadcast({ t: 'ev', e: 'bank', id: p.id, n, v: total, score: p.score });
       }
+    }
+    // oxygen: drains underwater, refills at the surface or inside the beacon habitat
+    for (const p of this.players.values()) {
+      if (!p.alive || !p.connected) continue;
+      const dt = 1 / TICK_RATE;
+      const surfaced = p.y + PLAYER.eye > level - 0.15;
+      const habitat = Math.hypot(p.x - W.BANK.x, p.z - W.BANK.z) < W.BANK.r + 2 && Math.abs(p.y - W.heightAt(W.BANK.x, W.BANK.z)) < 7;
+      if (surfaced || habitat) p.o2 = Math.min(PLAYER.o2Max, p.o2 + PLAYER.o2RegenPerSec * dt);
+      else p.o2 = Math.max(0, p.o2 - PLAYER.o2DrainPerSec * dt);
+      if (p.o2 <= 0) this.drown(p, PLAYER.drownDps * dt);
     }
     // carried relics follow their carrier (server position)
     for (const r of this.relics) if (r.state === 'carried') { const c = this.players.get(r.carrier); if (c) { r.x = c.x; r.y = c.y; r.z = c.z; } }
@@ -428,7 +442,7 @@ export class Room {
     {
       const snap = { t: 'snap', n: this.tickN, rt: r2(this.rt), tl: Math.max(0, Math.ceil((this.matchEnd - t) / 1000)), ph: this.phase === 'play' ? 0 : 1,
         p: [...this.players.values()].map((p) => [p.id, r2(p.x), r2(p.y), r2(p.z), r2(p.yaw), r2(p.pitch), p.anim, Math.round(p.hp), p.w, p.carried.length,
-          (p.alive ? 1 : 0) | (this.invuln(p) ? 2 : 0) | (p.connected ? 0 : 4)]) };
+          (p.alive ? 1 : 0) | (this.invuln(p) ? 2 : 0) | (p.connected ? 0 : 4), Math.round(p.o2)]) };
       if (this.relicsDirty) { snap.r = this.relicRows(); this.relicsDirty = false; }
       if (this.boardDirty || t - this.lastBoard > 2000) {
         snap.b = [...this.players.values()].map((p) => [p.id, p.score, p.kills, p.deaths]); this.boardDirty = false; this.lastBoard = t;
