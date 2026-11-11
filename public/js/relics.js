@@ -1,4 +1,4 @@
-// Relic visuals: floating treasures with beacon columns when exposed by the tide.
+// Relic visuals: floating treasures with beacon columns always collectable underwater.
 import * as THREE from 'three';
 import { T, A } from './textures.js';
 
@@ -52,7 +52,7 @@ export class Relics {
       const show = r.st === 0;
       r.group.visible = show;
       if (!show) continue;
-      const exposed = level < r.y + 0.1;
+      const exposed = true;
       r.group.position.set(r.x, r.y + 0.55 + Math.sin(t * 2 + r.id) * 0.08, r.z);
       r.group.rotation.y = t * 0.9 + r.id;
       r.col.visible = exposed; r.col.rotation.y = -r.group.rotation.y;
