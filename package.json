@@ -1,0 +1,23 @@
+{
+  "name": "tidefall",
+  "version": "1.0.0",
+  "description": "TIDEFALL - a tidal salvage brawl. Original 3D multiplayer browser game.",
+  "type": "module",
+  "main": "server.js",
+  "private": true,
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "vendor": "node scripts/vendor.js",
+    "postinstall": "node scripts/vendor.js",
+    "test": "node test/server-test.mjs && node test/swim-test.mjs"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "three": "0.160.0",
+    "ws": "^8.18.0"
+  }
+}
