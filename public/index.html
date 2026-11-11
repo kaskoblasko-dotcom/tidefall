@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>TIDEFALL</title>
-<meta name="description" content="TIDEFALL - a tidal salvage brawl for up to 12 players.">
+<title>DEEPFALL</title>
+<meta name="description" content="DEEPFALL - a sunken-world salvage brawl for up to 12 players.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%2312181c'/%3E%3Cpath d='M2 20 Q8 12 16 20 T30 20 V30 H2Z' fill='%233f9a94'/%3E%3Cpath d='M15 4h2v14h-2z' fill='%23c4572f'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="css/style.css">
 <script type="importmap">{ "imports": { "three": "./vendor/three.module.js" } }</script>
@@ -19,7 +19,7 @@
   <div id="hud-tl" class="panel">
     <div class="row between"><b id="h-room">-</b><span id="h-code" class="mono muted"></span></div>
     <div class="row between"><span id="h-target" class="muted">First to 25</span><span id="h-time" class="mono">9:00</span></div>
-    <div id="tide"><div id="tide-bar"><i id="tide-fill"></i><u id="tide-you"></u></div><div class="row between small"><span id="tide-label">Tide</span><span id="tide-next" class="mono muted"></span></div></div>
+    <div id="o2"><div class="row between small"><span>Oxygen</span><span class="mono"><span id="o2-n">100</span> &middot; <span id="depth-n">0 m</span></span></div><div id="o2bar"><i id="o2-fill"></i></div></div>
   </div>
   <div id="hud-tr">
     <div id="lb" class="panel"></div>
@@ -45,12 +45,12 @@
 
 <!-- ============ SCREENS ============ -->
 <section id="scr-loading" class="screen center">
-  <div class="loadbox"><div class="logo">TIDEFALL</div><div class="bar"><i id="load-fill"></i></div><div id="load-text" class="muted small">Starting up...</div></div>
+  <div class="loadbox"><div class="logo">DEEPFALL</div><div class="bar"><i id="load-fill"></i></div><div id="load-text" class="muted small">Starting up...</div></div>
 </section>
 
 <section id="scr-menu" class="screen" hidden>
   <div class="menu-panel">
-    <div class="logo">TIDEFALL</div>
+    <div class="logo">DEEPFALL</div>
     <div class="tag">A tidal salvage brawl</div>
     <label class="field"><span>Callsign</span><input id="in-name" maxlength="16" placeholder="Salvager" autocomplete="off" spellcheck="false"></label>
     <nav class="menu">
@@ -64,7 +64,7 @@
     </nav>
     <div id="srv" class="srv"><i></i><span id="srv-text">Connecting...</span></div>
   </div>
-  <div class="menu-foot muted small">v1.0 - W/A/S/D move, mouse aim, 1-3 weapons. Mind the tide.</div>
+  <div class="menu-foot muted small">v1.0 - W/A/S/D swim, Space up, C down, 1-3 weapons. Watch your air.</div>
 </section>
 
 <section id="scr-browser" class="screen center" hidden>
@@ -132,21 +132,20 @@
     <div class="cols">
       <div>
         <h3>Goal</h3>
-        <p>The tide uncovers wrecks and treasure on the flats. Grab relics, carry them up to the <b>Beacon</b> brazier on the lighthouse plateau and bank them. First crew member to the score target (or the highest score when time runs out) wins.</p>
-        <h3>The tide</h3>
-        <ul><li>It rises and falls on a shared clock (about 2.5 minutes).</li>
-        <li>Submerged relics cannot be picked up. Deep tide pearls only surface near the lowest water.</li>
-        <li>Water above your waist slows you; in deep water you swim and the current <b>tears loot away</b>.</li>
-        <li>Blunderbuss powder <b>soaks</b> in water. The cutlass and harpoon don't care.</li></ul>
+        <p>A drowned world lies under the waves. Swim the seabed, grab relics from the wrecks and reefs, and bank them at the <b>Beacon</b> habitat on the lighthouse plateau. First crew member to the score target (or the highest score when time runs out) wins.</p>
+        <h3>Oxygen</h3>
+        <ul><li>Your air drains underwater and refills at the surface or inside the Beacon habitat.</li>
+        <li>Run out and you drown. Deeper water is darker, so plan your route.</li>
+        <li>Relics are always collectable. Weapons work everywhere.</li></ul>
         <h3>Loot</h3><p>Carry up to 3. Each slows you a little. Die and you drop them. A harpoon hit hooks a relic loose.</p>
       </div>
       <div>
         <h3>Controls</h3>
-        <table class="keys"><tr><td>W A S D</td><td>Move</td></tr><tr><td>Mouse</td><td>Aim</td></tr><tr><td>Shift</td><td>Sprint</td></tr><tr><td>Space</td><td>Jump</td></tr>
-        <tr><td>Left click</td><td>Attack</td></tr><tr><td>1 / 2 / 3 / wheel</td><td>Cutlass / Harpoon / Blunderbuss</td></tr><tr><td>R</td><td>Reload</td></tr>
+        <table class="keys"><tr><td>W A S D</td><td>Move</td></tr><tr><td>Mouse</td><td>Aim</td></tr><tr><td>Shift</td><td>Sprint</td></tr><tr><td>Space / C</td><td>Swim up / down</td></tr>
+        <tr><td>Left click</td><td>Attack</td></tr><tr><td>1 / 2 / 3 / wheel</td><td>Knife / Harpoon / Burst Cannon</td></tr><tr><td>R</td><td>Reload</td></tr>
         <tr><td>Q</td><td>Dash (brief invulnerability)</td></tr><tr><td>Tab</td><td>Scoreboard</td></tr><tr><td>Esc</td><td>Pause menu</td></tr></table>
         <h3>Weapons</h3>
-        <ul><li><b>Cutlass</b> - 30 dmg cleave. Backstab x1.5.</li><li><b>Harpoon Gun</b> - 55 dmg, headshot x1.5, one shot then a slow reload.</li><li><b>Blunderbuss</b> - 8 pellets, brutal up close, two shells.</li></ul>
+        <ul><li><b>Dive Knife</b> - 30 dmg cleave. Backstab x1.5.</li><li><b>Harpoon Gun</b> - 55 dmg, headshot x1.5, one shot then a slow reload.</li><li><b>Burst Cannon</b> - 8 pellets, brutal up close, two charges.</li></ul>
       </div>
     </div>
   </div>
@@ -155,7 +154,7 @@
 <section id="scr-pause" class="screen center" hidden>
   <div class="dialog narrow">
     <header><h2>Paused</h2></header>
-    <p class="muted small">The tide doesn't wait. You are still in the match.</p>
+    <p class="muted small">The deep doesn't wait. You are still in the match.</p>
     <nav class="menu">
       <button id="p-resume" class="primary">Resume</button>
       <button id="p-settings">Settings</button>
