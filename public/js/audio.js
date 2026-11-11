@@ -79,6 +79,7 @@ class AudioEngine {
       case 'wet': this.noise(o, 0.35, { type: 'bandpass', f0: 1400, f1: 500, q: 2, vol: 0.2 }); break;
       case 'reload': this.tone(o, 1200, 0.03, { type: 'square', vol: 0.07 }); this.tone(o, 800, 0.04, { type: 'square', vol: 0.07, delay: 0.16 }); this.noise(o, 0.05, { type: 'highpass', f0: 3000, vol: 0.15, delay: 0.5 }); break;
       case 'swap': this.noise(o, 0.08, { type: 'highpass', f0: 2000, vol: 0.1 }); this.tone(o, 600, 0.05, { type: 'triangle', vol: 0.06 }); break;
+      case 'bubble': this.noise(o, 0.18, { type: 'bandpass', f0: 500, f1: 1500, q: 2, vol: 0.12 }); break;
       case 'dash': this.noise(o, 0.28, { type: 'bandpass', f0: 300, f1: 1800, q: 0.9, vol: 0.3 }); break;
       case 'jump': this.tone(o, 220, 0.12, { type: 'triangle', vol: 0.09, f1: 330 }); break;
       case 'land': this.noise(o, 0.1, { f0: 400, vol: 0.18 }); break;
