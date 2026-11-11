@@ -1,4 +1,4 @@
-// TIDEFALL game server: Express (static files + health + room list) and a
+// DEEPFALL game server: Express (static files + health + room list) and a
 // WebSocket endpoint (/ws) for all realtime gameplay. Deploy as a Render Web Service.
 import express from 'express';
 import http from 'node:http';
@@ -98,7 +98,7 @@ const heartbeat = setInterval(() => {
   }
 }, 25000);
 
-server.listen(PORT, '0.0.0.0', () => console.log(`TIDEFALL server v${VERSION} listening on :${PORT}`));
+server.listen(PORT, '0.0.0.0', () => console.log(`DEEPFALL server v${VERSION} listening on :${PORT}`));
 
 function shutdown() {
   console.log('shutting down');
